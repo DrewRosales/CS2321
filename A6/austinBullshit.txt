@@ -1,0 +1,286 @@
+package cs2321;
+
+
+import cs2321.LinkedBinaryTree.Node;
+import net.datastructures.Entry;
+import net.datastructures.Map;
+import net.datastructures.Position;
+import net.datastructures.SortedMap;
+
+
+public class BinarySearchTree<K extends Comparable<K>,V> extends AbstractMap<K,V> implements SortedMap<K,V> {
+	
+	/* all the data will be stored in tree*/
+	LinkedBinaryTree<Entry<K,V>> tree; 
+	int size;  //the number of entries (mappings)
+	/* 
+	 * default constructor
+	 */
+	public BinarySearchTree() {
+		tree = new LinkedBinaryTree<Entry<K,V>>(); 
+		tree.addRoot(null);
+	}
+	
+	
+	/* 
+	 * Return the tree. The purpose of this method is purely for testing. 
+	 * You don't need to make any change. Just make sure to use object tree to store your entries. 
+	 */
+	public LinkedBinaryTree<Entry<K,V>> getTree() {
+		return tree;
+	}
+	
+	//Used for the tree search finding where the position is. 
+	private Position<Entry<K,V>> treeSearch(Position<Entry<K, V>> p, K key){
+		if(tree.isExternal(p))
+			return p;
+		int comp = key.compareTo(p.getElement().getKey());
+		if(comp == 0)
+			return p;
+		else if(comp < 0)
+			return treeSearch(tree.left(p), key);
+		else
+			return treeSearch(tree.right(p), key);
+	}
+	
+	//Determines if the key is valid
+	protected boolean checkKey(K key) throws IllegalArgumentException{
+		try {
+			return(key.compareTo(key) == 0); //if the key can be compared to itself.
+		}catch (ClassCastException e) {
+			throw new IllegalArgumentException("Incompatible key");
+		}
+	}
+	
+	//Returns the size of the bst
+	@TimeComplexity("O(1)")
+	//Because it just returns the size
+	@Override
+	public int size(){
+		return(tree.size() -1) /2; //Returns the size of the BinarySearchTree
+	}
+	
+	//Returns the value associated with the specified key, or null if no such entry exists
+	@TimeComplexity("O(n)")
+	//Because the worst case it just goes to the height aka n
+	@Override
+	public V get(K key) {
+		checkKey(key);
+		Position<Entry<K,V>> p = treeSearch(tree.root(),key);
+		if(tree.isExternal(p))
+			return null;
+		return p.getElement().getValue();
+	}
+
+	private void expandExternal(Position<Entry<K, V>>p, Entry<K, V> entry) {
+		 tree.set(p, entry);
+		 tree.addLeft(p, null);
+		 tree.addRight(p, null);
+	}
+	
+	//Associates the given value with the given key. If an entry with
+	//the key was already in the map, this replaced the previous value
+	//with the new one and returns the old value. Otherwise, a new
+	//entry is added and null is returned
+	@TimeComplexity("O(n)")
+	//Because the worst case it goes to the height, it can't go farther then that because its a BST.
+	@Override
+	public V put(K key, V value) {
+
+		checkKey(key);
+		Entry<K,V> newEntry = new mapEntry<>(key, value);
+		Position<Entry<K, V>> p = treeSearch(tree.root(), key);
+		if(tree.isExternal(p)) {
+			expandExternal(p, newEntry);
+			return null;
+		} else {
+			V old = p.getElement().getValue();
+			tree.set(p,  newEntry);
+			return old;
+		}
+	}
+
+	
+	//Removes the entry with the specified key, if present, and returns its associated value.
+	//Otherwise does nothing and returns null.
+	@TimeComplexity("O(n)")
+	//Worst case it just goes to the height of the tree, it can't be more then the height of the tree.
+	@Override
+	public V remove(K key)throws IllegalArgumentException {
+		checkKey(key);
+		Position<Entry<K, V>> p = treeSearch(tree.root(), key);
+		if(tree.isExternal(p)) {
+			return null;
+		}else {
+			V old = p.getElement().getValue();
+			if(tree.isInternal(tree.left(p)) && tree.isInternal(tree.right(p))) { //both children are internal
+					Position<Entry<K, V>> replacement = treeMax(tree.left(p));
+					tree.set(p, replacement.getElement());
+					p = replacement;
+			}
+			Position<Entry<K, V>> leaf = (tree.isExternal(tree.left(p))) ? tree.left(p) : tree.right(p);
+			tree.remove(leaf);
+			tree.remove(p);
+			return old;
+		}
+	}
+
+	//For getting the maximum key in the subtree rooted at p.
+	protected Position<Entry<K, V>> treeMax(Position<Entry<K, V>> p){
+		Position<Entry<K,V>> walk = p;
+		while(tree.isInternal(walk))
+			walk = tree.right(walk);
+		return tree.parent(walk);
+	}
+	protected Position<Entry<K, V>> treeSmall(Position<Entry<K, V>> p){
+		Position<Entry<K,V>> walk = p;
+		while(tree.isInternal(walk))
+			walk = tree.left(walk);
+		return tree.parent(walk);
+	}
+
+	//Returns an iterable collection of all key-value entries of the map.
+	@TimeComplexity("O(n)")
+	//Because it has to re-arrange the tree.
+	@Override
+	public Iterable<Entry<K, V>> entrySet() {
+		ArrayList<Entry<K, V>> buffer = new ArrayList<>(size());
+		for(Position<Entry<K, V>> p : tree.preorder())
+			if(tree.isInternal(p)) buffer.addLast(p.getElement());
+		return buffer;
+	}
+
+	
+	//Returns the entry having the least key (or null if map is empty).
+	@TimeComplexity("O(n)")
+	//Because it has to re-arrange the tree
+	@Override
+	public Entry<K, V> firstEntry() {
+		if(isEmpty())
+			return null;
+		return treeSmall(tree.root()).getElement();
+	}
+	
+	
+	//Returns the entry having the greatest key (or null if map is empty).
+	@TimeComplexity("O(n)")
+	//Because it has to re-arrange the tree to get the greatest key.
+	@Override
+	public Entry<K, V> lastEntry() {
+		if(isEmpty())
+			return null;
+		return treeMax(tree.root()).getElement();
+	}
+	
+	//Returns the entry with least key greater than or equal to given key(or null if no such key exists).
+	@TimeComplexity("O(n)")
+	//Because it has to search the tree
+	@Override
+	public Entry<K, V> ceilingEntry(K key) {
+		checkKey(key);
+		Position<Entry<K,V>> p = treeSearch(tree.root(), key);
+		if(tree.isInternal(p))
+			return p.getElement();
+		while(!tree.isRoot(p)) {
+			if(p == tree.left(tree.parent(p)))
+				return tree.parent(p).getElement();
+			else
+				p = tree.parent(p);
+		}
+		return null; //No floor exists
+	}
+
+	
+	//Returns the entry with least key greater than or equal to given key(or null if no such key exists).
+	@TimeComplexity("O(n)")
+	//Because it has to search tree
+	@Override
+	public Entry<K, V> floorEntry(K key)  {
+		checkKey(key);
+		Position<Entry<K,V>> p = treeSearch(tree.root(), key);
+		if(tree.isInternal(p))
+			return p.getElement();
+		while(!tree.isRoot(p)) {
+			if(p == tree.right(tree.parent(p)))
+				return tree.parent(p).getElement();
+			else
+				p = tree.parent(p);
+		}
+		return null; //No floor exists
+	}
+
+	//Returns the entry with greatest key strictly less than given key(or null if no such key exists).
+	@TimeComplexity("O(n)")
+	//Because it has to re-arrange the tree 
+	@Override
+	public Entry<K, V> lowerEntry(K key) {
+		checkKey(key);
+		Position<Entry<K,V>> p = treeSearch(tree.root(), key);
+		if(tree.isInternal(p) && tree.isInternal(tree.left(p)))
+				return treeMax(tree.left(p)).getElement();
+		while(!tree.isRoot(p)) {
+			if(p == tree.right(tree.parent(p)))
+				return tree.parent(p).getElement();
+			else
+				p = tree.parent(p);
+		}
+		return null;
+			
+	}
+
+	//Returns the entry with least key greater than or equal to given key(or null if no such key exists).
+	@TimeComplexity("O(n)")
+	//Because it has to re-arrange the tree
+	@Override
+	public Entry<K, V> higherEntry(K key){
+		checkKey(key);
+		Position<Entry<K,V>> p = treeSearch(tree.root(), key);
+		if(tree.isInternal(p) && tree.isInternal(tree.right(p)))
+				return treeSmall(tree.right(p)).getElement();
+		while(!tree.isRoot(p)) {
+			if(p == tree.right(tree.parent(p)))
+				return tree.parent(p).getElement();
+			else
+				p = tree.parent(p);
+		}
+		return null;
+			
+	}
+
+	//Recursive helper function for subMap
+	private void subMapRecursive(K fromKey, K toKey, Position<Entry<K,V>>p, ArrayList<Entry<K, V>> buffer) {
+		if(tree.isInternal(p))
+			if(p.getElement().getKey().compareTo(fromKey) < 0)
+				subMapRecursive(fromKey, toKey, tree.right(p), buffer);
+			else {
+				subMapRecursive(fromKey, toKey, tree.left(p), buffer);
+				if(p.getElement().getKey().compareTo(fromKey) < 0) {
+					buffer.addLast(p.getElement());
+					subMapRecursive(fromKey, toKey, tree.right(p), buffer);
+				}
+			}
+	}
+	
+	//Returns an iterable containing all keys in the range from fromKey inclusive to toKey exclusive
+	@TimeComplexity("O(n)")
+	//Because it recursively recalls a helper function
+	@Override
+	public Iterable<Entry<K, V>> subMap(K fromKey, K toKey)
+			throws IllegalArgumentException {
+		ArrayList<Entry<K,V>> buffer = new ArrayList<>(size());
+		if(fromKey.compareTo(toKey)< 0)
+			subMapRecursive(fromKey, toKey, tree.root(), buffer);
+		return buffer;
+	}
+
+	//Returns an iterable containing all keys in the range from fromKey inclusive to toKey exclusive
+	@TimeComplexity("O(1)")
+	//Because it returns if it is empty or not
+	@Override
+	public boolean isEmpty() {
+		return tree.isEmpty();
+	}
+
+	
+
+}
